@@ -1,189 +1,425 @@
-# wealth_pb_ee_models
+# WEALTH activPAL Inference
 
-Machine learning models and utilities for predicting **Physical Behaviour (PB)** and **Energy Expenditure (EE)** from wearable sensor data within the WEALTH project framework.
+Containerised application for processing **activPAL wearable data** using the WEALTH physical-behaviour and energy-expenditure inference pipeline.
 
-This repository provides pretrained models and processing pipelines for analysing data collected with **activPAL** and **ActiGraph** devices in free-living conditions.
+The application packages the complete runtime environment into a **Docker container**, including the Python environment, dependencies, WEALTH package, preprocessing utilities, pretrained models, and inference code.
+
+The main objective is to provide a **reproducible and portable way to run activPAL inference without installing the application and its dependencies directly on the host machine**.
 
 ---
 
 ## Overview
 
-`wealth_pb_ee_models` is a Python package developed within the WEALTH project to support the automated analysis of wearable accelerometer data for:
+The application takes activPAL data as input, executes the WEALTH inference pipeline inside a Docker container, and writes the resulting predictions to an output directory.
 
-- **Physical Behaviour (PB) classification**
-- **Energy Expenditure (EE) estimation**
+The container provides an isolated execution environment containing:
 
-The package implements machine learning and deep learning pipelines for large-scale, real-world monitoring of physical activity and sedentary behaviour.
+- Python 3.12
+- Required Python dependencies
+- `wealth_pb_ee_models`
+- Pretrained inference models
+- activPAL data-processing utilities
+- Inference scripts
 
-The models and methods are based on data collected from multi-centre European cohorts and evaluated under free-living conditions.
-
----
-
-## Supported Sensors and Formats
-
-The package supports multiple input formats:
-
-### activPAL
-- Compressed files: `.datx`
-- Uncompressed CSV files: `.csv`
-
-### ActiGraph
-- Raw files: `.gt3x`
-
-### Combined Data
-- Synchronized activPAL + ActiGraph CSV files (Synchronized data should be provided at a sampling frequency of 20 Hz): `.csv`
+The host machine only needs to have **Docker** installed.
 
 ---
 
-## Processing Pipeline
+## Architecture
 
-The implemented pipeline comprises:
+The current application follows a simple batch-processing architecture:
 
-1. **Data loading and preprocessing**
-2. **Signal synchronisation (dual-sensor)**
-3. **Sliding-window segmentation**
-4. **Feature extraction / raw-signal handling**
-5. **Model-based inference**
-6. **Post-processing**
-7. **Label decoding and formatting**
+```text
+Host machine
+│
+├── input/
+│   └── activPAL data
+│
+├── output/
+│   └── predictions
+│
+└── Docker
+      │
+      ▼
+┌──────────────────────────────┐
+│     wealth-activpal           │
+│                              │
+│  Python 3.12                 │
+│  WEALTH package              │
+│  Dependencies                │
+│  Pretrained models           │
+│  Inference application       │
+│                              │
+│  /app/input  ────────────────┼──► Input
+│  /app/output ◄───────────────┼─── Output
+└──────────────────────────────┘
+```
 
-The output consists of time-resolved and aggregated predictions for PB and EE.
-
----
-
-## Predicted Outputs
-
-### Physical Behaviour (PB)
-
-Seven activity classes:
-
-- Sitting  
-- Standing  
-- Walking  
-- Running  
-- Cycling  
-- Sports  
-- Lying  
-
-### Energy Expenditure (EE)
-
-Three intensity levels:
-
-- Sedentary  
-- Light Physical Activity (LPA)  
-- Moderate-to-Vigorous Physical Activity (MVPA)
+The container is intentionally separated from the host filesystem. Input and output data are exchanged through **Docker volume mounts**.
 
 ---
 
-## Installation
+# Docker Deployment
 
-### Requirements
+## Requirements
 
-- Python ≥ 3.9
+The only software required on the host machine is:
 
-### Install from Source
+- Docker
 
-Clone the repository and install in editable mode:
+No Python installation is required on the host.
+No Python packages need to be installed on the host.
+
+---
+
+## Build the Image
+
+Clone the repository:
 
 ```bash
 git clone https://github.com/luisfrancs/wealth_pb_ee_models.git
 cd wealth_pb_ee_models
-pip install -e .
-
 ```
-### Dependencies
 
-Main dependencies include:
+Build the Docker image:
 
-- NumPy  
-- Pandas  
-- Scikit-learn  
-- Joblib  
-- pygt3x  
+```bash
+docker build \
+  -t wealth-activpal \
+  -f deployment/activpal/Dockerfile .
+```
 
-All dependencies are defined in `pyproject.toml`.
+This command:
+
+1. Uses the specified Python base image.
+2. Installs the container dependencies.
+3. Copies the WEALTH package into the image.
+4. Installs the package.
+5. Copies the activPAL inference application.
+6. Creates the `wealth-activpal` Docker image.
+
+The resulting image contains everything required to execute the inference pipeline.
+
 ---
 
-## Package Structure
+## Run the Container
 
-The repository follows a standard `src`-based layout:
+Create input and output directories:
+
+```bash
+mkdir -p input output
+```
+
+Place the activPAL input file in the `input` directory.
+
+For example:
+
+```text
+project/
+├── input/
+│   └── participant.datx
+└── output/
+```
+
+Run the container:
+
+```bash
+docker run --rm \
+  -v "$(pwd)/input:/app/input" \
+  -v "$(pwd)/output:/app/output" \
+  wealth-activpal
+```
+
+### Volume mapping
+
+The `-v` options connect directories on the host machine with directories inside the container:
+
+```text
+Host                    Container
+────────────────────────────────────────
+./input          →      /app/input
+./output         ←      /app/output
+```
+
+Therefore, files placed in:
+
+```text
+./input/
+```
+
+are available to the application at:
+
+```text
+/app/input/
+```
+
+and files generated by the application in:
+
+```text
+/app/output/
+```
+
+are immediately available on the host in:
+
+```text
+./output/
+```
+
+---
+
+## `docker run` Options
+
+The standard command is:
+
+```bash
+docker run --rm \
+  -v "$(pwd)/input:/app/input" \
+  -v "$(pwd)/output:/app/output" \
+  wealth-activpal
+```
+
+### `--rm`
+
+Automatically removes the temporary container after execution.
+
+The Docker image is **not** removed.
+
+This is useful for batch processing because each execution starts a fresh container.
+
+### `-v`
+
+Creates a volume mount between the host and container.
+
+For example:
+
+```bash
+-v "$(pwd)/input:/app/input"
+```
+
+means:
+
+> Make the local `input` directory available inside the container as `/app/input`.
+
+### `wealth-activpal`
+
+Specifies the Docker image that should be used to create the container.
+
+---
+
+# Input and Output
+
+## Input
+
+The application reads activPAL data from:
+
+```text
+/app/input
+```
+
+The corresponding host directory is:
+
+```text
+./input
+```
+
+Supported activPAL formats currently include:
+
+- `.datx`
+- `.csv`
+
+Example:
+
+```text
+input/
+└── participant.datx
+```
+
+---
+
+## Output
+
+Inference results are written to:
+
+```text
+/app/output
+```
+
+and therefore become available on the host through:
+
+```text
+./output
+```
+
+Example:
+
+```text
+output/
+├── participant_predictions.csv
+└── ...
+```
+
+The exact output files depend on the inference configuration implemented in the deployment application.
+
+---
+
+# Container Configuration
+
+The Docker configuration is located in:
+
+```text
+deployment/
+└── activpal/
+    ├── Dockerfile
+    ├── requirements.txt
+    └── ...
+```
+
+### Dockerfile
+
+The `Dockerfile` defines the complete runtime environment.
+
+It specifies:
+
+- Base Python image
+- Working directory
+- Python dependencies
+- WEALTH package installation
+- Application files
+- Container entry point
+
+### Requirements
+
+Container-specific dependencies are defined in:
+
+```text
+deployment/activpal/requirements.txt
+```
+
+This keeps deployment dependencies separate from the main Python package configuration.
+
+---
+
+# Project Structure
 
 ```text
 wealth_pb_ee_models/
+│
 ├── src/
 │   └── wealth_pb_ee_models/
-│       ├── models/          # Pretrained ML/DL models
-│       ├── utils/           # Data loading and processing utilities
-│       ├── pipeline/        # Inference workflows
-│       ├── sample_data/     # Example datasets
-│       └── config/          # Configuration files
+│       └── ...                    # WEALTH Python package
 │
-├── notebooks/              # Example Jupyter/Colab notebooks
+├── deployment/
+│   └── activpal/
+│       ├── Dockerfile             # Container definition
+│       ├── requirements.txt       # Container dependencies
+│       └── ...                    # Inference application
+│
+├── notebooks/
+│   └── ...                        # Development/analysis notebooks
+│
 ├── pyproject.toml
 ├── README.md
 └── LICENSE
 ```
-## Example Notebooks (Google Colab)
 
-Example notebooks are provided in the `notebooks/` directory.
-
-They are designed to be executed in **Google Colab**.
-
-### Recommended Workflow
-
-1. Open the notebook in Colab  
-2. Select **File → Save a copy in Drive**  
-3. Run and modify your private copy  
-
-[![Run in Google Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/luisfrancs/wealth_pb_ee_models/blob/main/examples/ActivePAL_Daily_prediction_GITHUB_FINAL.ipynb)
+The `deployment/activpal/` directory contains the components required to run the application as a container.
 
 ---
 
-## Scientific Background
+# Reproducibility
 
-The models are based on multitask learning approaches combining:
+Containerisation ensures that the inference pipeline runs in a controlled software environment.
 
-- Multi-Head Convolutional Neural Networks (MH-CNN)  
+Instead of depending on the configuration of the host machine:
 
-They were developed and validated using long-term free-living data from the WEALTH project.
+```text
+Host Python
+Host packages
+Host versions
+Host configuration
+        │
+        ▼
+   Inference
+```
 
-The methodological foundations are described in peer-reviewed and preprint publications associated with the WEALTH consortium.
+the application uses a fixed container environment:
 
----
+```text
+Docker image
+│
+├── Python version
+├── Python dependencies
+├── WEALTH package
+├── Models
+└── Inference application
+        │
+        ▼
+     Results
+```
 
-## Publications
-
-If you use this software, please cite the following publications:
-
-1. Sigcha L, et al.  
-   **Data Labelling for Free-Living Physical Activity Recognition using Thigh-Worn Wearables and Event-based Ecological Momentary Assessment.**  
-   *Research Square*, 2025 (Preprint).  
-   (https://www.researchsquare.com/article/rs-6835979/v1)
-
-2. Hayes G, et al.  
-   **Standardized Methods for Evaluating Physical and Eating Behaviours: The WEALTH Project.**  
-   *JMIR Research Protocols*, 2024 (Preprint).  
-   https://preprints.jmir.org/preprint/70186
-   
----
-
-## Data Availability
-
-Raw participant data from the WEALTH project are not publicly distributed due to ethical and regulatory constraints.
-
-Access may be granted upon reasonable request and in accordance with institutional approvals.
-
-This repository provides:
-
-- Pretrained models  
-- Configuration files  
-- Demonstration datasets in `sample_data/`  
-
-These resources support reproducibility and methodological validation.
+This reduces dependency conflicts and makes the application easier to deploy across different machines.
 
 ---
 
-## License
+# Development vs Deployment
+
+The repository supports two complementary workflows.
+
+### Development
+
+The Python package can be installed locally:
+
+```bash
+pip install -e .
+```
+
+This workflow is intended for:
+
+- Development
+- Debugging
+- Modifying the inference pipeline
+- Experimentation
+- Notebook-based analysis
+
+### Deployment
+
+The Docker workflow is intended for:
+
+- Reproducible inference
+- Batch processing
+- Deployment on different machines
+- Integration into larger processing systems
+- Future API-based deployment
+
+For deployment, the recommended approach is to use the Docker container rather than installing the complete Python environment manually.
+
+---
+
+# Future API Deployment
+
+The containerised application provides the foundation for a service-based deployment.
+
+The planned architecture is:
+
+```text
+Client
+  │
+  │ CSV upload
+  ▼
+FastAPI
+  │
+  ▼
+WEALTH inference pipeline
+  │
+  ▼
+Predictions
+```
+
+The Docker container can therefore serve as the deployment environment for a future **FastAPI REST API**, allowing users or external applications to submit wearable data through an HTTP endpoint rather than interacting directly with the filesystem.
+
+---
+
+# License
 
 This project is licensed under the **MIT License**.
 
@@ -191,29 +427,21 @@ See the `LICENSE` file for details.
 
 ---
 
-## Authors and Contributors
+# Authors
 
-**Luis Sigcha, PhD**  
-University of Limerick  
-Email: luisfrancs@gmail.com  
-
-WEALTH Consortium
-
-Contributions from partner institutions in Czechia, France, Germany, and Ireland.
+**Luis Sigcha, PhD**
 
 ---
 
-## Citation
+Citation
 
 If you use this software in academic work, please cite both this repository and the associated WEALTH publications.
 
-### Software Citation
+Software Citation
 
-```bibtex
 @software{wealth_pb_ee_models,
   author  = {Sigcha, Luis},
   title   = {wealth\_pb\_ee\_models: Machine Learning Models for Physical Behaviour and Energy Expenditure Estimation},
   year    = {2026},
   url     = {https://github.com/luisfrancs/wealth_pb_ee_models}
 }
-
