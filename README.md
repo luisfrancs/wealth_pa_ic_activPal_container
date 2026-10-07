@@ -445,3 +445,26 @@ Software Citation
   year    = {2026},
   url     = {https://github.com/luisfrancs/wealth_pb_ee_models}
 }
+
+---
+
+## Publications
+
+If you use this software, please cite the following publications:
+
+1. Sigcha L, et al.  
+   **Data Labelling for Free-Living Physical Activity Recognition using Thigh-Worn Wearables and Event-based Ecological Momentary Assessment.**  
+   *Research Square*, 2025 (Preprint).  
+   (https://www.researchsquare.com/article/rs-6835979/v1)
+
+2. Sigcha L, et al.  
+   **Robust Assessment of Free-Living Physical Behaviors and Activity Intensity Using Dual-Wearable Multitask Learning: Development and Evaluation Study From the Multicenter WEALTH Project.**  
+   *JMIR mHealth and uHealth*. 2026;14:e94302.  
+   https://doi.org/10.2196/94302
+
+3. Hayes G, et al.  
+   **Standardized Methods for Evaluating Physical and Eating Behaviors: The WEALTH Cross-Sectional Study Protocol.**  
+   *JMIR Research Protocols*. 2026;15:e70186.  
+   https://doi.org/10.2196/70186
+
+---
